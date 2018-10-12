@@ -1,0 +1,158 @@
+---
+title: "R_Assignment"
+author: "Andy Herr"
+date: "October 11, 2018"
+output: html_document
+---
+#Part 1
+##Data Inspection
+- For Data inspection I find it easiest to use UNIX and repeat the steps taken in the previous assinment. 
+
+###fang et al genotypes.txt
+1. **File Size**
+	1. `du -h fang_et_al_genotypes.txt`
+		- File Size: 11M
+2. **wc**
+	1. `wc fang_et_al_genotypes.txt`
+		- Number of Lines: 2783
+		- Number of Words: 2744038
+		- Number of Characters: 11051939 
+2. **Head**
+	1. `head fang_et_al_genotypes.txt`
+		- Way to much printed to screen
+	2. `head -n 2 fang_et_al_genotypes.txt` 
+		- Still unreadable
+	
+2. **Tail**
+	1. Same issues as with head
+2. **Determine Number of Columns**
+	1. `awk -F "\t" '{print NF; exit}' fang_et_al_genotypes.txt`
+		- Number of columns: 986
+	2. `tail -n +4 fang_et_al_genotypes.txt | awk -F "\t" '{print NF; exit}'`
+		- confirm column number
+###snp_position.txt
+1. **File Size**
+	1. `du -h snp_position.txt`
+		- File Size: 81K
+2. **wc**
+	1. `wc snp_position.txt`
+		- Lines: 984
+		- Words: 13198
+		- Characters: 82763
+2. **Head**
+	1.	`column -t snp_position.txt | head -n 4`
+		- Looks like SNP data
+		- desired columns are 1,3,4
+	
+2. **Tail**
+	1. `column -t snp_position.txt | tail -n 6`
+		- confirmed snp data
+	
+2. **Determine Number of Columns**
+	1. `awk -F "\t" '{print NF; exit}' snp_position.txt`
+		- Number of Columns: 15
+		
+###Inspection Conclusion
+####fang et al genotypes.txt
+ - File Size: **11M**
+ - Number of Columns: **986**
+ - Number of Lines: **2783**
+ - This is genotype data 
+####snp_position.txt
+ - File Size: **81K**
+ - Number of Column: **15**
+ - Number of Lines: **984** 
+ - This is position data
+
+
+##Data Processing	
+Load tidyverse
+>library(tidyverse)
+
+1. Import Data
+>genotypes <- read_tsv(file.choose())
+     
+>position <- read_tsv(file.choose())
+
+3. Transpose Geno Data
+>Geno.Tran <- t(genotypes)
+
+4. Convert to tibble data and fix column and row names names
+>Geno.Tran <- as.tibble(Geno.Tran)
+>colnames(Geno.Tran) <- Geno.Tran[1,]
+>Geno.Tran <- add_column(Geno.Tran, SNP_ID = colnames(genotypes), .before=1)
+
+5. Merge Files
+>merged <- left_join(Geno.Tran, position, by="SNP_ID")
+
+6. Remove Unwanted Columns
+>merged<- filter(merged,!((SNP_ID == "Sample_ID") | (SNP_ID =="JG_OTU"))) 
+%>% select(-cdv_marker_id, -alt_pos, -mult_positions, -amplicon, -cdv_map_feature.name, -gene, -`candidate/random`, -Genaissance_daa_id, -Sequenom_daa_id, -count_amplicons, -count_cmf, -count_gene)
+
+7. Create Split Files 
+>maize <- select(merged, SNP_ID, Chromosome, Position)
+>teo <- select(merged, SNP_ID, Chromosome, Position)
+
+8. Split files
+
+> for (i in 1:length(colnames(merged))) {
+     if (merged[1,i] %in% c("ZMMIL", "ZMMLR", "ZMMMR")) {
+         maize <- cbind(maize, merged[,i])
+     }
+     if(merged[1,i] %in% c("ZMPBA", "ZMPIL", "ZMPJA")) {
+         teo <- cbind(teo, merged[,i])
+     }
+ }
+
+9. Clean New Files (rm unknown and multiple)
+
+> maize.clean<- filter(maize,!(Chromosome %in% c("multiple", "unknown")))
+> maize.clean<- filter(maize.clean,!(Position %in% c("multiple", "unknown")))
+> teo.clean<- filter(teo,!(Chromosome %in% c("multiple", "unknown")))
+> teo.clean<- filter(teo.clean,!(Position %in% c("multiple", "unknown")))
+
+10. Convert to Position and Chromosome Columns to Integer Values
+
+>maize.clean$Chromosome<-as.numeric(as.character(maize.clean$Chromosome))
+>maize.clean$Position<-as.numeric(as.character(maize.clean$Position))
+>teo.clean$Chromosome<-as.numeric(as.character(teo.clean$Chromosome))
+>teo.clean$Position<-as.numeric(as.character(teo.clean$Position))
+
+11. Produce Files 
+
+>for(i in c(1:10)) {
+  filter(maize.clean, Chromosome==i) %>% 
+    dplyr::arrange(Position) %>% 
+    write_tsv(paste("Maize_IN_Chr", i,".txt", sep="")) 
+}
+>for(i in c(1:10)) {
+  filter(teo.clean, Chromosome==i) %>% 
+    dplyr::arrange(Position) %>%
+    write_tsv(paste("Teosinte_IN_Chr", i, ".txt", sep=""))
+}
+>for(i in c(1:10)) {
+  filter(maize.clean, Chromosome==i) %>% 
+    dplyr::arrange(desc(Position)) %>% 
+    mutate_all(funs(str_replace_all(., fixed("?"), "-"))) %>% 
+    write_tsv(paste("Maize_DE_Chr", i, ".txt", sep="")) 
+}
+>for(i in c(1:10)) {
+  filter(teo.clean, Chromosome==i) %>% 
+    dplyr::arrange(desc(Position)) %>% 
+    mutate_all(funs(str_replace_all(., fixed("?"), "-"))) %>% 
+    write_tsv(paste("Teosinte_DE_Chr", i, ".txt", sep=""))
+}
+
+#Part 2
+Load needed packages
+>library(reshape2)
+>library(ggplot2)
+
+1. Chromosome with the Most Snps | Chromosome 1 has the most SNPs
+>ggplot(position) + geom_bar(aes(x=Chromosome), color="black", fill="green4") + labs(x="Chromosome",y="# of SNPs")
+
+2. Determine Heterozigosity 
+ - I could not figure this one out 
+
+3. Determine if there are more multiple locations or unknown | There are more unknown 
+>ggplot(teo) + geom_bar(aes(x=Chromosome), color="black", fill="green4") + labs(x="Chromosome",y="# of SNPs")
