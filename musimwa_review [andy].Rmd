@@ -1,0 +1,28 @@
+---
+title: "musimwa_review for  Andy"
+author: "musimwa"
+date: "October 15, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+Your codes are straighforward and easy to follow. I think you should try the data inspection using R codes if you can. Some data inspection codes in R which mught be using are shown below. Do not forget to add your own visualization.
+
+```{r}
+head(, n=)
+str()
+dim()
+class()
+typeof()
+levels(filename$Group)
+colnames()
+print(object.size(), units="Mb")
+```
+
+
